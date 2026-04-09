@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Stínový Trh v5.0 - Interaktivní</title>
+    <style>
+        /* Tmavý hackerský styl */
+        body { background-color: #080808; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; margin: 0; padding: 30px; transition: box-shadow 1s; overflow-x: hidden; }
+        h1 { color: #ff003c; text-align: center; text-transform: uppercase; letter-spacing: 4px; border-bottom: 2px solid #ff003c; padding-bottom: 15px; text-shadow: 0 0 10px rgba(255,0,60,0.5); }
+        
+        /* Horní panel */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border: 1px solid #333; margin-bottom: 30px; box-shadow: 0 0 10px rgba(0,255,65,0.1); }
+        .balance-info { color: #f7931a; font-weight: bold; font-size: 1.2em; display: flex; align-items: center; }
+        .cart-status { color: #00ff41; font-weight: bold; font-size: 1.2em; display: flex; align-items: center; gap: 15px; }
+        .cart-button { cursor: pointer; padding: 5px 10px; border: 1px dashed transparent; transition: 0.3s; }
+        .cart-button:hover { border: 1px dashed #00ff41; background: rgba(0, 255, 65, 0.1); }
+
+        .hack-btn { background-color: #333; color: #00ff41; border: 1px dashed #00ff41; padding: 5px 10px; cursor: pointer; font-size: 0.8em; margin-left: 15px; }
+        .hack-btn:hover { background-color: #00ff41; color: #000; }
+
+        .grid { display: flex; gap: 25px; justify-content: center; flex-wrap: wrap; }
+        
+        /* Karty produktů + SKENOVACÍ ANIMACE */
+        .product { border: 1px solid #333; background: #111; padding: 25px; width: 280px; text-align: center; transition: all 0.3s; position: relative; overflow: hidden; }
+        .product:hover { transform: scale(1.02); border-color: #ff003c; box-shadow: 0 0 20px rgba(255,0,60,0.2); }
+        
+        /* Laserový skener přes kartu */
+        .product::after {
+            content: ""; position: absolute; top: -100%; left: 0; width: 100%; height: 2px;
+            background: rgba(255, 0, 60, 0.5); box-shadow: 0 0 15px #ff003c;
+            transition: none;
+        }
+        .product:hover::after { animation: scan 2s linear infinite; }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+
+        .price { color: #f7931a; font-weight: bold; font-size: 1.3em; margin: 15px 0; transition: color 0.5s; }
+        
+        .btn-group { display: flex; gap: 10px; flex-direction: column; }
+        .buy-btn { background-color: #1a1a1a; color: #fff; border: 1px solid #555; padding: 10px; cursor: pointer; font-family: inherit; text-transform: uppercase; font-weight: bold; transition: 0.2s; }
+        .buy-btn:hover { background-color: #ff003c; border-color: #ff003c; }
+        .info-btn { background-color: transparent; color: #888; border: 1px solid #333; padding: 5px; cursor: pointer; font-family: inherit; font-size: 0.8em; }
+        .info-btn:hover { color: #fff; border-color: #777; }
+        
+        /* Terminál */
+        #terminal { margin-top: 50px; padding: 20px; background: #000; border: 1px dashed #444; color: #00ff41; height: 180px; overflow-y: auto; display: none; }
+        .log-line { margin-bottom: 5px; }
+        .error { color: #ff003c; font-weight: bold; }
+        .success { color: #f7931a; font-weight: bold; }
+
+        /* MODALY (Košík a Detail) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: #0a0a0a; border: 1px solid #ff003c; padding: 30px; width: 450px; box-shadow: 0 0 30px rgba(255,0,60,0.4); position: relative; }
+        .modal-content h2 { color: #ff003c; margin-top: 0; text-transform: uppercase; }
+        .detail-text { color: #00ff41; font-size: 0.9em; line-height: 1.6; }
+        .glitch-text { color: #ff003c !important; text-shadow: 2px 0 red, -2px 0 blue; }
+        .vip-mode { box-shadow: inset 0 0 80px rgba(255, 0, 60, 0.4); }
+
+/* Styly pro temný graf Bitcoinu */
+        .market-chart-container {
+            background: #080808; 
+            border: 1px solid #222; 
+            box-shadow: 0 0 15px rgba(255, 0, 60, 0.1); 
+            width: calc(100% - 60px); 
+            max-width: 1000px; 
+            margin: 0 auto 30px auto; 
+            padding: 15px; 
+            position: relative; 
+            overflow: hidden; 
+        }
+        .chart-header {
+            display: flex; justify-content: space-between; align-items: center;
+            color: #888; font-family: monospace; font-size: 0.9em; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #1a1a1a;
+        }
+        .chart-pair { color: #f7931a; font-weight: bold; }
+        .bitcoin-chart-image {
+            width: 100%; height: auto; display: block; filter: contrast(120%) brightness(85%) hue-rotate(180deg); /* Mírné zabarvení obrázku */
+        }
+        
+        /* Falešný efekt skenování na grafu */
+        .chart-overlay-blinker {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0, 255, 65, 0.03), rgba(0, 0, 0, 0));
+            animation: scanline 4s linear infinite; pointer-events: none;
+        }
+        @keyframes scanline { 0% { top: -100%; } 100% { top: 100%; } }
+
+    </style>
+</head>
+<body>
+
+<div id="boot-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#000; color:#00ff41; font-family:monospace; z-index:9999; padding:20px; overflow:hidden;">
+    <div id="boot-log"></div>
+</div>
+
+    <div id="detail-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="detail-title">NAČÍTÁNÍ...</h2>
+            <div id="detail-body" class="detail-text"></div>
+            <button class="buy-btn" style="margin-top:20px;" onclick="closeDetail()">ZAVŘÍT PŘÍSTUP</button>
+        </div>
+    </div>
+
+    <div id="cart-modal" class="modal">
+        <div class="modal-content">
+            <h2>PŘEDÁVACÍ UZEL (Košík)</h2>
+            <div id="cart-items-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
+            <div style="font-size: 1.5em; font-weight: bold; color: #f7931a; text-align: right; border-top: 1px dashed #333; padding-top: 15px;">
+                Celkem: ₿ <span id="cart-total-price">0.0000</span>
+            </div>
+            <button class="buy-btn" style="width:100%; margin-top:15px;" onclick="payCart()">PROVÉST ANONYMNÍ PLATBU</button>
+            <button class="info-btn" style="width:100%; margin-top:10px;" onclick="closeCart()">ZRUŠIT</button>
+        </div>
+    </div>
+
+    <div class="top-bar">
+        <div class="balance-info">
+            Peněženka: ₿ <span id="wallet-balance">2.5000</span>
+            <button class="hack-btn" onclick="injectFunds()">[ INJEKCE BTC ]</button>
+        </div>
+        <div id="btc-ticker" style="margin-left: 20px; font-family: monospace; border-left: 1px solid #333; padding-left: 20px;">
+    <span style="color: #888; font-size: 0.8em;">BTC/USD:</span> 
+    <span id="btc-price" style="transition: all 0.5s;">$64,230.50</span>
+    <span id="btc-pct" style="font-size: 0.8em; margin-left: 5px;">+0.12%</span>
+</div>
+        <div class="cart-status">
+            <button class="hack-btn" onclick="adminLogin()" style="color: #ff003c; border-color: #ff003c;">[ PŘIHLÁSIT ]</button>
+            <span class="cart-button" onclick="openCart()">🛒 Košík: <span id="cart-count">0</span> položek</span>
+        </div>
+    </div>
+    
+<div class="market-chart-container">
+    <div class="chart-header">
+        <span class="chart-pair">BTC/USD (TRADINGVIEW DATA)</span>
+        <span class="chart-time">1D - 1Y HISTORIE (ZÍSKÁNO Z DECENTR. UZLU)</span>
+    </div>
+    <img src="btc_graf.png" alt="Historický Graf Bitcoinu" class="bitcoin-chart-image">
+    <div class="chart-overlay-blinker"></div>
+</div>
+
+    <h1>Broke trh</h1>
+    
+    <div class="grid">
+        <div class="product">
+            <h3>Kvantový USB disk</h3>
+            <p>Nezjistitelný úložný prostor s autodestrukcí.</p>
+            <div class="price">₿ 0.0450</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Kvantový USB disk', 0.0450)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('USB', 'Kvantový USB disk')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Záhadná krabice</h3>
+            <p>Fyzická zásilka na mrtvou schránku. Obsah neznámý.</p>
+            <div class="price">₿ 0.1200</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Záhadná krabice', 0.1200)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('BOX', 'Záhadná krabice')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Zero-Day Exploit</h3>
+            <p>Zranitelnost pro routery. Plný root přístup.</p>
+            <div class="price">₿ 1.5000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Zero-Day Exploit', 1.5000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('EXPLOIT', 'Zero-Day Exploit')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Falešná identita</h3>
+            <p>Pas + digitální stopa. Kompletní zmizení.</p>
+            <div class="price">₿ 4.2000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Falešná identita', 4.2000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('ID', 'Falešná identita')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Orgány Vyktora</h3>
+            <p>srdce a ledvina vyktora. Jsou použitelné a plně funkční. Operace v ceně.</p>
+            <div class="price">₿ 5.5000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Orgány Vyktora', 0.5000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('Orgány', 'Orgány Vyktora')">[ DETAIL ]</button>
+            </div>
+        </div>
+
+        <div class="product">
+            <h3>Epstein island</h3>
+            <p>Skvělí ostrov na rodinné výlety s dětmi. Se zábavou a známími osobnostmi.</p>
+            <div class="price">₿ 100.0000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Epstein island', 1.0000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('Little Saint James', 'Epstein island')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>černý Vyktor</h3>
+            <p>Pracuje kdykoliv mu řeknete. Vypraví dementní vtipy. Je retard.</p>
+            <div class="price">₿ 0.0001</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Vyktor', 0.0001)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('Gorlock', 'Vyktor')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Ghost-Phone v2</h3>
+            <p>Telefon bez GPS a mikrofonu. Jen čistá satelitní data.</p>
+            <div class="price">₿ 1.2000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Ghost-Phone v2', 1.2000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('PHONE', 'Ghost-Phone v2')">[ DETAIL ]</button>
+            </div>
+        </div>
+        <div class="product">
+            <h3>Satelitní Uplink</h3>
+            <p>60 minut kontroly nad starou meteorologickou družicí.</p>
+            <div class="price">₿ 12.5000</div>
+            <div class="btn-group">
+                <button class="buy-btn" onclick="addToCart('Satelitní Uplink', 12.5000)">Do košíku</button>
+                <button class="info-btn" onclick="showDetail('SAT', 'Satelitní Uplink')">[ DETAIL ]</button>
+            </div>
+        </div>
+
+    <div id="terminal">
+        <div class="log-line">> Systémový terminál inicializován... čekám na příkazy.</div>
+    </div>
+
+    <script>
+        let balance = 2.5000;
+        let isGlitching = false;
+        let cartList = [];
+        const terminal = document.getElementById('terminal');
+
+        function logTerminal(message, type = 'normal') {
+            terminal.style.display = 'block';
+            const newLine = document.createElement('div');
+            if (type === 'error') newLine.className = 'log-line error';
+            else if (type === 'success') newLine.className = 'log-line success';
+            else newLine.className = 'log-line';
+            newLine.innerText = '> ' + message;
+            terminal.appendChild(newLine);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // --- NOVINKA: ZOBRAZENÍ DETAILU ---
+        const detailsData = {
+            'USB': "SPECIFIKACE: Kapacita 2TB. Materiál: Wolfram. Obsahuje nálož termitu pro okamžité zničení při neautorizovaném pokusu o přístup.",
+            'BOX': "INFO: Zásilka je odesílána z náhodného skladu v Evropě. Váha cca 2kg. Může obsahovat hardware nebo kryptografické klíče.",
+            'EXPLOIT': "KÓD: 0x88FF21. Cílová zařízení: Všechny routery s jádrem Linux 2.4+. Umožňuje dálkové spuštění kódu.",
+            'ID': "BALÍČEK: Pas EU, řidičský průkaz, rodný list. Včetně záznamu v databázích. Dodání fyzicky do 3 dnů.",
+            
+            // TADY JSOU TY TVOJE NOVÉ DETAILY:
+            'Orgány': "Kus života:Srdce které patřilo idiotovi kterého nikdo neměl rád. Jeho biologická rodina ho vykuchala.",
+            'Little Saint James': "Ostrov:Ostrov kde jezdí děti po celém světě, i známé legendy, influenceři a vědci.",
+            'Gorlock': "Tlusťoch: Je línný ale když použijete byč, tak pracuje jako o život. váží nejmíň sto kilo."
+        };
+
+        function showDetail(key, name) {
+            const body = document.getElementById('detail-body');
+            document.getElementById('detail-title').innerText = name;
+            body.innerHTML = "Skenuji databázi...<br>[||||||||||          ] 50%";
+            document.getElementById('detail-modal').style.display = 'flex';
+
+            setTimeout(() => {
+                const randomId = Math.floor(Math.random() * 999999);
+                body.innerHTML = `ID PRODUKTU: #${randomId}<br>STAV: SKLADEM<br><br>${detailsData[key]}<br><br><span style="color:#ff003c">!!! TATO DATA BUDOU PO ZAVŘENÍ SMAZÁNA !!!</span>`;
+            }, 800);
+        }
+
+        function closeDetail() { document.getElementById('detail-modal').style.display = 'none'; }
+
+        // --- ZBYTEK FUNKCÍ (ROOT, HACK, KOŠÍK) ZŮSTÁVÁ STEJNÝ ---
+        function adminLogin() {
+            let code = prompt("ZADEJ PŘÍSTUPOVÝ KÓD:", "");
+            if (code === "ROOT") {
+                logTerminal("ROOT PŘÍSTUP POVOLEN. INICIALIZUJI PROTOKOL OMEGA...", "success");
+                isGlitching = true; balance = 999999;
+                const balanceSpan = document.getElementById('wallet-balance');
+                balanceSpan.classList.add('glitch-text');
+                setInterval(() => { balanceSpan.innerText = (Math.random() * 9999).toFixed(4); }, 50);
+                document.body.classList.add('vip-mode');
+                document.querySelectorAll('.price').forEach(p => { p.innerText = "₿ 0.0000 (VIP)"; p.style.color = "#ff003c"; });
+            } else { logTerminal("PŘÍSTUP ZAMÍTNUT.", "error"); }
+        }
+
+        function injectFunds() {
+            let amount = prompt("Počet BTC k injekci:", "10.0000");
+            if (amount && !isNaN(amount)) {
+                balance += parseFloat(amount);
+                if (!isGlitching) document.getElementById('wallet-balance').innerText = balance.toFixed(4);
+                logTerminal(`HACK ÚSPĚŠNÝ: +${amount} BTC`, 'success');
+            }
+        }
+
+        function addToCart(itemName, originalPrice) {
+            let price = isGlitching ? 0 : originalPrice;
+            cartList.push({ name: itemName, price: price });
+            document.getElementById('cart-count').innerText = cartList.length;
+            logTerminal(`[${itemName}] přidáno do košíku.`, 'normal');
+        }
+
+        function openCart() {
+            const listDiv = document.getElementById('cart-items-list');
+            let total = 0; listDiv.innerHTML = '';
+            if (cartList.length === 0) listDiv.innerHTML = '<p style="text-align:center">Prázdno.</p>';
+            else {
+                cartList.forEach(item => {
+                    let p = isGlitching ? 0 : item.price; total += p;
+                    listDiv.innerHTML += `<div style="display:flex;justify-content:space-between;margin:5px 0;"><span>${item.name}</span><span style="color:#f7931a">₿ ${p.toFixed(4)}</span></div>`;
+                });
+            }
+            document.getElementById('cart-total-price').innerText = total.toFixed(4);
+            document.getElementById('cart-modal').style.display = 'flex';
+        }
+
+        function closeCart() { document.getElementById('cart-modal').style.display = 'none'; }
+
+        function payCart() {
+            let total = 0; cartList.forEach(item => { total += (isGlitching ? 0 : item.price); });
+            if (balance < total) { logTerminal("NEDOSTATEK BTC!", "error"); closeCart(); return; }
+            balance -= total;
+            if (!isGlitching) document.getElementById('wallet-balance').innerText = balance.toFixed(4);
+            logTerminal(`Platba ${total.toFixed(4)} BTC proběhla přes anonymní uzel.`, "success");
+            cartList = []; document.getElementById('cart-count').innerText = 0; closeCart();
+        }
+        
+        // --- DYNAMICKÝ KURZ BITCOINU ---
+let lastPrice = 64230.50;
+
+function updateBTCPrice() {
+    const priceElement = document.getElementById('btc-price');
+    const btcPairElement = document.querySelector('.chart-pair');
+    btcPairElement.innerText = "BTC/USD | " + lastPrice.toLocaleString('en-US', {minimumFractionDigits: 2});
+    const pctElement = document.getElementById('btc-pct');
+    
+    // Náhodná změna ceny mezi -50 a +50 dolary
+    let change = (Math.random() * 100) - 50;
+    let newPrice = lastPrice + change;
+    let pct = (change / lastPrice * 100).toFixed(2);
+    
+    // Nastavení barvy podle pohybu
+    if (change > 0) {
+        priceElement.style.color = "#00ff41"; // Zelená
+        pctElement.style.color = "#00ff41";
+        pctElement.innerText = "+" + pct + "% ▲";
+    } else {
+        priceElement.style.color = "#ff003c"; // Červená
+        pctElement.style.color = "#ff003c";
+        pctElement.innerText = pct + "% ▼";
+    }
+    
+    priceElement.innerText = "$" + newPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    lastPrice = newPrice;
+
+    // Po krátkém zablikání vrátit barvu na neutrální (volitelné)
+    setTimeout(() => {
+        priceElement.style.color = "#f7931a"; 
+    }, 800);
+}
+
+// Spustit aktualizaci každé 3 sekundy
+setInterval(updateBTCPrice, 3000);
+
+const messages = [
+    "INITIALIZING TOR PROXY...",
+    "CONNECTING TO ONION ROUTER [OK]",
+    "BYPASSING GOVERNMENT FIREWALL... [DONE]",
+    "ESTABLISHING SECURE TUNNEL TO NODE: 184.22.1.9",
+    "DECRYPTING DATABASE [AES-256]...",
+    "ACCESS GRANTED - WELCOME TO SHADOW MARKET"
+];
+
+let msgIndex = 0;
+const bootLog = document.getElementById('boot-log');
+
+function runBoot() {
+    if (msgIndex < messages.length) {
+        const line = document.createElement('div');
+        line.innerText = "> " + messages[msgIndex];
+        bootLog.appendChild(line);
+        msgIndex++;
+        setTimeout(runBoot, 400); // Rychlost vypisování
+    } else {
+        setTimeout(() => {
+            document.getElementById('boot-screen').style.display = 'none';
+        }, 800);
+    }
+}
+
+// Spustit hned po načtení
+window.onload = runBoot;
+
+    </script>
+</body>
+</html> 
